@@ -26,7 +26,7 @@ WEIGHTED = 1
 
 K_fold = 2
 topic_bins = []
-load_pickled = False  # Whether want to load pickled bins from pk file
+load_pickled = True  # Whether want to load pickled bins from pk file
 
 def run_phaseone():
     if load_pickled:
@@ -72,11 +72,14 @@ def run_phasetwo():
     f1 = file('topicbins.pkl', 'rb')
     bins = pk.load(f1)
     newbins = []
+    total = 0
+
     for bin in bins:
         if len(bin) > 0:
             newbins.append(bin)
-
+            total+=len(bin)
     print 'number of non-empty bins: ',len(newbins)
+    print 'total products: ',total
 
     ######################
     ## Cross Validation ##
@@ -119,7 +122,7 @@ def run_phasetwo():
             if MODEL_TYPE == 0:
                 clf.fit(X_train, y_train)
             else:
-                clf.BuildModel(model='full')
+                clf.BuildModel(model='sparse')
 
             # try using Gaussian Processing Regression:
             # if MODEL_TYPE == 1:
@@ -138,7 +141,8 @@ def run_phasetwo():
                 result = clf.predict(test_data[0].values)
 
             result_matrix.append(result)
-            variance_matrix.append(variance)
+            if MODEL_TYPE == 1:
+                variance_matrix.append(variance)
             print 'model ', i , ' trained and predicted, time used: ', time() - time0
         if MODEL_TYPE == 0:
             y_predicted = process.weighted_sum(np.matrix(result_matrix), uids, weight_d_t, WEIGHTED)
@@ -153,19 +157,24 @@ def run_phasetwo():
         print 'Iteration ', iteration, ': All models trained, time used:', time() - time0_0
         iteration += 1
 
-
         with open('data/results.csv', 'a') as f:
             j = 0
             conf_int_count = 0
             writer = csv.writer(f)
             for i in test_index:
-                ll = [i, test_set['id'][j:j+1], weight_d_t[uids[j]], np.argmax(weight_d_t[uids[j]]), y_predicted[j], test_data[1].values[j], abs(y_predicted[j] - test_data[1].values[j]) \
-                        ,wt_variance_matrix[j],(y_predicted[j]+wt_variance_matrix[j],y_predicted[j] - wt_variance_matrix[j])]
-                writer.writerow(ll)
-                if test_data[1].values[j] < y_predicted[j]+ 2*wt_variance_matrix[j] and test_data[1].values[j]> y_predicted[j] - 2*wt_variance_matrix[j]:
-                    conf_int_count += 1
+                if MODEL_TYPE == 1:
+                    ll = [i, test_set['id'][j:j+1], weight_d_t[uids[j]], np.argmax(weight_d_t[uids[j]]), y_predicted[j], test_data[1].values[j], abs(y_predicted[j] - test_data[1].values[j]) \
+                            ,wt_variance_matrix[j],(y_predicted[j]+wt_variance_matrix[j],y_predicted[j] - wt_variance_matrix[j])]
+                    writer.writerow(ll)
+                    if test_data[1].values[j] < y_predicted[j]+ 2*wt_variance_matrix[j] and test_data[1].values[j]> y_predicted[j] - 2*wt_variance_matrix[j]:
+                        conf_int_count += 1
+                else:
+                    ll = [i, test_set['id'][j:j+1], weight_d_t[uids[j]], np.argmax(weight_d_t[uids[j]]), y_predicted[j], test_data[1].values[j], abs(y_predicted[j] - test_data[1].values[j])]
+                    writer.writerow(ll)
+
                 j += 1
-            print conf_int_count, ' ', j, conf_int_count*100//j
+            if MODEL_TYPE == 1:
+                print conf_int_count, ' ', j, conf_int_count*100//j
     error_f = np.mean(errors)
 
     print '\nJOB DONE: the ', K_fold, ' fold Cross Validation has completed, time used: ', time() - timezero
