@@ -1,3 +1,4 @@
+from __future__ import division
 from src.Lda import Lda
 from src.SecondPhase import SecondPhase
 from collections import defaultdict
@@ -174,7 +175,7 @@ def run_phasetwo():
 
                 j += 1
             if MODEL_TYPE == 1:
-                print conf_int_count, ' ', j, conf_int_count*100//j
+                print conf_int_count, ' ', j, conf_int_count*100/j
     error_f = np.mean(errors)
 
     print '\nJOB DONE: the ', K_fold, ' fold Cross Validation has completed, time used: ', time() - timezero

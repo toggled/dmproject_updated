@@ -29,7 +29,7 @@ def stemmer(sent):
         return ' '.join([stem(word) for word in word_tokenize(sent.lower()) if word not in stop])
 
 
-loaded = True  # True, If autoload self.df_all from MergedProductInfo csv file, False if i want to make it on the fly.
+loaded = True   # True, If autoload self.df_all from MergedProductInfo csv file, False if i want to make it on the fly.
 NUM_TOPICS = 50  # Number of Topics i want to extract Out of the whole corpus of documents.
 n_top_words = 10  # Number of words per topic having most probability.
 
@@ -48,8 +48,10 @@ class Lda:
         #self.topic_words = []  # List of List of String
 
         if not loaded:
-            df_attr = pd.read_csv('data/attributes.csv', encoding="ISO-8859-1")
-            groups = df_attr.groupby(['product_uid'])
+            df_pro_desc = pd.read_csv('data/product_descriptions.csv')
+            '''
+            #df_attr = pd.read_csv('data/attributes.csv', encoding="ISO-8859-1")
+            #groups = df_attr.groupby(['product_uid'])
             # print len(groups)
 
             ht = []
@@ -57,28 +59,31 @@ class Lda:
                 ht.append((name, ' '.join([i for i in gr['value'] if type(i) != float])))
 
             df_attr = pd.DataFrame(ht, columns=['product_uid', 'value'])
+            '''
 
-            df_pro_desc = pd.read_csv('data/product_descriptions.csv')
             # print df_pro_desc.shape
 
-            df_all = pd.merge(df_attr, df_pro_desc, how='right', on='product_uid')
+            #df_all = pd.merge(df_attr, df_pro_desc, how='right', on='product_uid')
+            df_all = df_pro_desc
             print df_all.shape
 
 
-            print 'stemming values'
-            df_all['value'] = df_all['value'].map(lambda x: stemmer(x))
+            #print 'stemming values'
+            #df_all['value'] = df_all['value'].map(lambda x: stemmer(x))
             print 'stemming prod desc'
             df_all['product_description'] = df_all['product_description'].map(lambda x: stemmer(x))
 
-            df_all['allaboutproduct'] = df_all[['product_description', 'value']].apply(lambda x: '\t'.join(x), axis=1)
+            #df_all['allaboutproduct'] = df_all[['product_description', 'value']].apply(lambda x: '\t'.join(x), axis=1)
             df_all.to_csv('Allproductinfo.csv',encoding = "ISO-8859-1")
             self.df_all = df_all.drop(['product_uid'], axis=1)
 
         else:
-            #df_all  = pd.read_csv('Allproductinfo.csv', encoding="ISO-8859-1")
-            #df_extracted = df_all[['product_uid','allaboutproduct']]
+            df_all  = pd.read_csv('Allproductinfo.csv', encoding="ISO-8859-1")
+            df_extracted = df_all[['product_uid','product_description']]
 
-            #df_extracted.to_csv('src/MergedProductinfo.csv',encoding = "ISO-8859-1")
+            df_extracted.to_csv('src/MergedProductinfo.csv',encoding = "ISO-8859-1")
+            del df_extracted
+            del df_all
             self.df_all = pd.read_csv('src/MergedProductinfo.csv', encoding="ISO-8859-1")
 
 
@@ -92,7 +97,7 @@ class Lda:
                                      preprocessor=None, max_features=500)
         '''
 
-        feat = vectorizer.fit_transform(self.df_all['allaboutproduct'])
+        feat = vectorizer.fit_transform(self.df_all['product_description'])
 
         features = feat.toarray()
         # print features.shape
