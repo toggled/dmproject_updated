@@ -14,44 +14,49 @@ import csv
 
 __author__ = 'Naheed'
 
-bins_dir = '../'
-
 df_dir = 'data/'
 
 # if equals 0, use random forest, if equals 1, use gaussian process regression
 MODEL_TYPE = 1
 # Ture means for running on the fly(usually for the first time), False for running on the local stored data.
-realtime = False
+realtime = True
 # if weighted = 0, chose the model with highest probability, it weighted = 1, use weighted sum
 WEIGHTED = 1
 
 K_fold = 2
 topic_bins = []
-load_pickled = True  # Whether want to load pickled bins from pk file
+load_pickled = False  # Whether want to load pickled bins from pk file
+
+TOPIC_BINS_BASE = 'topicbins'
+DOC_TOPIC_BASE = 'doc_topic'
+BASEDIR = 'vartopic'
+#BASEDIR = 'varsample'
+INC_TOPICS = 5
+INC_ITER = 50
+run = -1
+runf = lambda x:[str(x),''][x==None]
 
 def run_phaseone():
+    topicbins_path = BASEDIR+'/'+TOPIC_BINS_BASE+str(run)+'.pkl'
+    docbins_path = BASEDIR+'/'+DOC_TOPIC_BASE+str(run)+'.pkl'
     if load_pickled:
         import pickle
-        with open('topicbins.pkl') as f:
+        with open(topicbins_path) as f:
             topic_bins = pickle.load(f)
 
     else:
-        ld = Lda()
-        ld.runlda()
+        ld = Lda(topicbins_path,docbins_path)
+        ld.runlda(n_topics = 20+run*INC_TOPICS, n_iteration = 50, max_feat = 15000)
         topic_bins = ld.bin  # List of List(product_id)
 
     for i in topic_bins:
         if i:
             print len(i)
 
-def run_phasetwo():
-    '''
-    TO DO:
-     1. Extract Features from training set, product description and attributes of the docs belonging to each bin.
-     2. Train K models on them.
-     3.
-    '''
 
+def run_phasetwo():
+    topicbins_path = BASEDIR+'/'+TOPIC_BINS_BASE+str(run)+'.pkl'
+    docbins_path = BASEDIR+'/'+DOC_TOPIC_BASE+str(run)+'.pkl'
     process = SecondPhase()
     timezero = time()
     num_train = 74067
@@ -68,9 +73,9 @@ def run_phasetwo():
     models = defaultdict(object)
     errors = []
     # weight_d_t is the documenet-topic probability, which is a list
-    f = file('doc_topic.pkl','rb')
+    f = file(docbins_path,'rb')
     weight_d_t = pk.load(f)
-    f1 = file('topicbins.pkl', 'rb')
+    f1 = file(topicbins_path, 'rb')
     bins = pk.load(f1)
     newbins = []
     total = 0
@@ -158,7 +163,7 @@ def run_phasetwo():
         print 'Iteration ', iteration, ': All models trained, time used:', time() - time0_0
         iteration += 1
 
-        with open('data/results.csv', 'a') as f:
+        with open('data/results'+runf(run)+'.csv', 'a') as f:
             j = 0
             conf_int_count = 0
             writer = csv.writer(f)
@@ -180,10 +185,24 @@ def run_phasetwo():
 
     print '\nJOB DONE: the ', K_fold, ' fold Cross Validation has completed, time used: ', time() - timezero
     print 'The mean of RMSE is: ', error_f
-
+    return error_f
 
 
 if __name__ == '__main__':
-    #run_phaseone()
-    run_phasetwo()
+    run = -3
+    rmse_run = []
+    import os
+    while run<0:
+        #CURDIR = BASEDIR+str(run)
+        if not os.path.exists(BASEDIR):
+            os.mkdir(BASEDIR)
+        #run_phaseone()
+        rmse_run.append(run_phasetwo())
+        run+=1
+    print rmse_run
+    '''
+    with open(BASEDIR+'/'+BASEDIR+'.txt','w') as f:
+        for item in rmse_run:
+            f.write(str(item)+'\n')
 
+    '''

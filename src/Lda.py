@@ -13,6 +13,7 @@ import cPickle as pk
 
 __author__ = 'Naheed'
 
+
 stop = stopwords.words('english')
 stem = SnowballStemmer('english').stem
 punc = string.punctuation
@@ -42,7 +43,10 @@ class Lda:
                 FIXED
     '''
 
-    def __init__(self):
+    def __init__(self,topicbins_path,doc_topicpath):
+        self.TOPIC_BINSPATH = topicbins_path
+        self.DOCBINS_PATH = doc_topicpath
+
         self.bin = []
         self.df_all = []  # Dataframe of (produid,merged description,attribute)
         #self.topic_words = []  # List of List of String
@@ -78,19 +82,19 @@ class Lda:
             self.df_all = df_all.drop(['product_uid'], axis=1)
 
         else:
-            df_all  = pd.read_csv('Allproductinfo.csv', encoding="ISO-8859-1")
-            df_extracted = df_all[['product_uid','product_description']]
+            #df_all  = pd.read_csv('Allproductinfo.csv', encoding="ISO-8859-1")
+            #df_extracted = df_all[['product_uid','product_description']]
 
-            df_extracted.to_csv('src/MergedProductinfo.csv',encoding = "ISO-8859-1")
-            del df_extracted
-            del df_all
+            #df_extracted.to_csv('src/MergedProductinfo.csv',encoding = "ISO-8859-1")
+            #del df_extracted
+            #del df_all
             self.df_all = pd.read_csv('src/MergedProductinfo.csv', encoding="ISO-8859-1")
 
 
-    def runlda(self):
+    def runlda(self,n_topics = 50,n_iteration = 50,max_feat = 15000):
         # vectorizer = CountVectorizer(encoding = "ISO-8859-1",analyzer = 'word',tokenizer = None,preprocessor= None)
         vectorizer = CountVectorizer(encoding="ISO-8859-1", analyzer='word', tokenizer=None, \
-                                             preprocessor=None, max_features=15000)
+                                             preprocessor=None, max_features=max_feat)
 
         '''
         vectorizer = CountVectorizer(encoding="ISO-8859-1", analyzer='word', tokenizer=None, \
@@ -101,7 +105,7 @@ class Lda:
 
         features = feat.toarray()
         # print features.shape
-        model = lda.LDA(n_topics=NUM_TOPICS, n_iter=50, random_state=1)
+        model = lda.LDA(n_topics=n_topics, n_iter=n_iteration, random_state=1)
 
         model.fit(features)
         topic_word = model.topic_word_
@@ -130,7 +134,7 @@ class Lda:
             self.bin[topic_most_pr].append(self.df_all['product_uid'][n])
 
         # Dump the bin into a pickle file to make the phase one independent of phase two
-        with open('topicbins.pkl', 'wb') as fp:
+        with open(self.TOPIC_BINSPATH, 'wb') as fp:
             pickle.dump(self.bin, fp)
 
         # Dump the weights into a pickle file, which is an dictionary
@@ -138,5 +142,6 @@ class Lda:
         for n in range(features.shape[0]):
             uid = int(self.df_all['product_uid'][n])
             d_t[uid] = self.doc_topic[n]
-        f = file('doc_topic.pkl', 'wb')
+
+        f = file(self.DOCBINS_PATH, 'wb')
         pickle.dump(d_t, f)
