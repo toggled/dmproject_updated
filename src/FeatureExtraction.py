@@ -122,7 +122,7 @@ def extract_features():
 
     df_all = df_all.drop(['search_term', 'product_title', 'product_description', 'product_info', 'attr', 'brand'],
                          axis=1)
-    df_all.to_csv('my_df_all.csv')
+    df_all.to_csv('../data/my_df_all.csv')
     print 'DONE'
 
 def autoload_featurevectors(name):
