@@ -9,7 +9,7 @@ from time import time
 from sklearn.cross_validation import KFold
 from sklearn.metrics import mean_squared_error
 import csv
-
+import math
 
 
 __author__ = 'Naheed'
@@ -29,11 +29,12 @@ load_pickled = False  # Whether want to load pickled bins from pk file
 
 TOPIC_BINS_BASE = 'topicbins'
 DOC_TOPIC_BASE = 'doc_topic'
-BASEDIR = 'vartopic'
-#BASEDIR = 'varsample'
+#BASEDIR = 'RF_vartopic(5-200)' # folder for storing topic sensitivity results
+BASEDIR = 'varsample' # folder for storing sample size sensitivity result
+#BASEDIR = 'test'
 INC_TOPICS = 5
-INC_ITER = 50
-run = -1
+INC_ITER = 10
+run = None
 runf = lambda x:[str(x),''][x==None]
 
 def run_phaseone():
@@ -46,7 +47,7 @@ def run_phaseone():
 
     else:
         ld = Lda(topicbins_path,docbins_path)
-        ld.runlda(n_topics = 20+run*INC_TOPICS, n_iteration = 50, max_feat = 15000)
+        ld.runlda(n_topics = 20+run*INC_TOPICS, n_iteration = 30, max_feat = 15000)
         topic_bins = ld.bin  # List of List(product_id)
 
     for i in topic_bins:
@@ -93,6 +94,7 @@ def run_phasetwo():
 
     kf = KFold(df.shape[0], n_folds=K_fold)
     iteration = 0
+    perc_confidence = []
     ## each iteration contains one fold CV, and the result is the RSME for this iteration
     for train_index, test_index in kf:
         result_matrix = []
@@ -163,16 +165,17 @@ def run_phasetwo():
         print 'Iteration ', iteration, ': All models trained, time used:', time() - time0_0
         iteration += 1
 
-        with open('data/results'+runf(run)+'.csv', 'a') as f:
+        with open(BASEDIR+'/result'+runf(run)+'.csv', 'a') as f:
             j = 0
             conf_int_count = 0
             writer = csv.writer(f)
             for i in test_index:
                 if MODEL_TYPE == 1:
+                    sd = math.sqrt(wt_variance_matrix[j])
                     ll = [i, test_set['id'][j:j+1], weight_d_t[uids[j]], np.argmax(weight_d_t[uids[j]]), y_predicted[j], test_data[1].values[j], abs(y_predicted[j] - test_data[1].values[j]) \
                             ,wt_variance_matrix[j],(y_predicted[j]+wt_variance_matrix[j],y_predicted[j] - wt_variance_matrix[j])]
                     writer.writerow(ll)
-                    if test_data[1].values[j] < y_predicted[j]+ 2*wt_variance_matrix[j] and test_data[1].values[j]> y_predicted[j] - 2*wt_variance_matrix[j]:
+                    if test_data[1].values[j] < y_predicted[j]+ 2*sd and test_data[1].values[j]> y_predicted[j] - 2*sd:
                         conf_int_count += 1
                 else:
                     ll = [i, test_set['id'][j:j+1], weight_d_t[uids[j]], np.argmax(weight_d_t[uids[j]]), y_predicted[j], test_data[1].values[j], abs(y_predicted[j] - test_data[1].values[j])]
@@ -181,28 +184,40 @@ def run_phasetwo():
                 j += 1
             if MODEL_TYPE == 1:
                 print conf_int_count, ' ', j, conf_int_count*100/j
+                perc_confidence.append(conf_int_count*100/j)
     error_f = np.mean(errors)
+    conf_f = np.mean(perc_confidence)
 
     print '\nJOB DONE: the ', K_fold, ' fold Cross Validation has completed, time used: ', time() - timezero
     print 'The mean of RMSE is: ', error_f
-    return error_f
+    return (error_f,conf_f)
 
 
 if __name__ == '__main__':
-    run = -3
+    run = -4
+    THRESHOLD  = 5
     rmse_run = []
+    perc_confidence = []
     import os
-    while run<0:
+    while run < THRESHOLD :
         #CURDIR = BASEDIR+str(run)
         if not os.path.exists(BASEDIR):
             os.mkdir(BASEDIR)
         #run_phaseone()
-        rmse_run.append(run_phasetwo())
-        run+=1
-    print rmse_run
-    '''
-    with open(BASEDIR+'/'+BASEDIR+'.txt','w') as f:
-        for item in rmse_run:
-            f.write(str(item)+'\n')
 
-    '''
+        er,conf = run_phasetwo()
+        rmse_run.append(er)
+        perc_confidence.append(conf)
+
+        run+=1
+    print rmse_run, perc_confidence
+
+    run = -4
+    with open(BASEDIR+'/'+BASEDIR+'.txt','a') as f:
+        for item in zip(rmse_run,perc_confidence):
+            f.write(str(50+run*INC_ITER)+' '+str(item[0])+' '+str(item[1])+"%"+'\n')
+            run+=1
+            if run == 0:
+                INC_ITER = 50
+
+
